@@ -25,7 +25,10 @@ package Kronos2.Bus is
    type T_DMA_Mandat is private;
 
    -- PROC Init: it initializes the bus
-   procedure Init(b: P_Bus);
+   procedure init(b: P_Bus);
+
+   -- PROC Init: it initializes the bus
+   procedure addMemory(b: P_Bus; m : P_MemoryBlock; paddr: T_Address);
 
    -- PROC Monitor: it is monitoring bus for fails
    procedure Monitor(b: P_Bus);
