@@ -7,10 +7,20 @@ package Kronos2.Memory is
    subtype T_BlockIndex is T_HalfWord range 0 .. (MEM_SLOTS - 1);
 
    type T_MemAccess is (ReadWrite, ReadOnly);
+   type T_MemResult is (Success, Fail);
 
    type T_ByteMemory is array (T_Word range <>) of T_Byte;
-   type P_ByteMemory is access all T_ByteMemory;
-   type P_MemoryBlock is new P_ByteMemory;
+   type P_ByteMemory is access T_ByteMemory;
+
+   type T_MemoryBlock is private;
+
+   type P_MemoryBlock is access T_MemoryBlock;
+
+   procedure initBlock(m: in P_MemoryBlock; ba : P_ByteMemory);
+
+   procedure markAsReadOnly(m: in P_MemoryBlock);
+   function isReadOnly(m: in P_MemoryBlock) return Boolean;
+
 
    function readByte (m: in P_MemoryBlock; addr : T_Word) return T_Byte;
    function readWord (m: in P_MemoryBlock; addr : T_Word) return T_Word;
@@ -18,6 +28,14 @@ package Kronos2.Memory is
    procedure writeByte (m: in P_MemoryBlock; addr : T_Word; val : T_Byte);
    procedure writeWord (m: in P_MemoryBlock; addr : T_Word; val : T_Word);
 
+   function hasFail(m: in P_MemoryBlock) return Boolean;
+
 private
+
+   type T_MemoryBlock is record
+      mode   : T_MemAccess;
+      state  : T_MemResult;
+      dat    : P_ByteMemory;
+   end record;
 
 end Kronos2.Memory;
