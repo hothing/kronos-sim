@@ -1,15 +1,26 @@
 package body Kronos2.Bus is
 
    ----------
-   -- Init --
+   -- init --
    ----------
 
-   procedure Init (b: P_Bus) is
+   procedure init (b: P_Bus) is
    begin
       --  Generated stub: replace with real body!
-      pragma Compile_Time_Warning (Standard.True, "Init unimplemented");
-      raise Program_Error with "Unimplemented procedure Init";
-   end Init;
+      pragma Compile_Time_Warning (Standard.True, "init unimplemented");
+      raise Program_Error with "Unimplemented procedure init";
+   end init;
+
+   ---------------
+   -- addMemory --
+   ---------------
+
+   procedure addMemory (b: P_Bus; m : P_MemoryBlock; paddr: T_Address) is
+   begin
+      --  Generated stub: replace with real body!
+      pragma Compile_Time_Warning (Standard.True, "addMemory unimplemented");
+      raise Program_Error with "Unimplemented procedure addMemory";
+   end addMemory;
 
    -------------
    -- Monitor --
