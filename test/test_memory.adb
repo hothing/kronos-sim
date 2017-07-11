@@ -39,4 +39,9 @@ begin
    Put(T_Word'Image(vo)); Put(" and expected "); Put_Line(T_Word'Image(vi));
    pragma Assert(vo = vi, "MA-15");
 
+   -- test *ReadOnly* feature
+   markAsReadOnly(ram);
+   adr := 13;
+   writeWord(ram, adr, vi); pragma Assert(hasFail(ram), "MA-16");
+
 end Test_Memory;
