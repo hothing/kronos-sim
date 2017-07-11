@@ -39,9 +39,13 @@ begin
    Put(T_Word'Image(vo)); Put(" and expected "); Put_Line(T_Word'Image(vi));
    pragma Assert(vo = vi, "MA-15");
 
+   -- test address which is out of range
+   adr := 64;
+   writeWord(ram, adr, vi); pragma Assert(hasFail(ram), "MA-16");
+
    -- test *ReadOnly* feature
    markAsReadOnly(ram);
    adr := 13;
-   writeWord(ram, adr, vi); pragma Assert(hasFail(ram), "MA-16");
+   writeWord(ram, adr, vi); pragma Assert(hasFail(ram), "MA-17");
 
 end Test_Memory;
