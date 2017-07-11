@@ -1,3 +1,5 @@
+with Kronos2.Memory; use Kronos2.Memory;
+
 package Kronos2.Bus is
 
    type T_BusState is (Bus_Ready,
@@ -95,14 +97,28 @@ package Kronos2.Bus is
    function checkItp(b: P_Bus; iptNo: T_Byte) return Boolean;
 
 private
+
+   type T_MemBlockInfo is record
+      m      : P_MemoryBlock;
+      paddr  : T_Address;
+   end record;
+
+
+   subtype T_MemArrayIndex is T_Word range 0 .. 31;
+
+   type T_MemoryArray is array (T_MemArrayIndex) of T_MemBlockInfo;
+
    type T_BusInternal is record
-      state : T_BusState;   -- state of the bus
-      radr  : T_Address; -- address for the bank/device
-      --cm    : P_MemoryBlock; -- actual bank
-      itps  : T_Interrupts; -- a quene of interrupts
-      itpn  : T_ItpRange;   -- amount of initiated interrupts                          --
+      state   : T_BusState;   -- state of the bus
+      radr    : T_Address; -- address for the bank/device
+
+      itps    : T_Interrupts; -- a quene of interrupts
+      itpn    : T_ItpRange;   -- amount of initiated interrupts                          --
 
       dma_on  : Boolean;
+
+      ma      : T_MemoryArray;
+      cm      : P_MemoryBlock; -- actual bank (cached pointer)
    end record;
 
    type T_DMA_Mandat is record
