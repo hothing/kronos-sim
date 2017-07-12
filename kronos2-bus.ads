@@ -25,10 +25,10 @@ package Kronos2.Bus is
    type T_DMA_Mandat is private;
 
    -- PROC Init: it initializes the bus
-   procedure init(b: P_Bus);
+   procedure init (b: P_Bus; full : Boolean := True; tmr: T_Word := 3);
 
    -- PROC Init: it initializes the bus
-   procedure addMemory(b: P_Bus; m : P_MemoryBlock; paddr: T_Address);
+   procedure addMemory (b: P_Bus; m : P_MemoryBlock; addr: T_Address);
 
    -- PROC Monitor: it is monitoring bus for fails
    procedure Monitor(b: P_Bus);
@@ -69,7 +69,7 @@ package Kronos2.Bus is
                        mnd : in out T_DMA_Mandat);
 
    -- PROC endDMA: it finishes DMA transfer
-   procedure endDMA(b: P_Bus);
+   procedure endDMA (mnd : in out T_DMA_Mandat);
 
    -- FUNC write is trying to write a word {bus.data} to a master device
    -- Before use it the adress must be assigned with {bus.addr}

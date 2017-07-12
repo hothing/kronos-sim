@@ -30,6 +30,8 @@ package Kronos2.Memory is
 
    function hasFail(m: in P_MemoryBlock) return Boolean;
 
+   function getSize(m: in P_MemoryBlock) return T_Word;
+
 private
 
    type T_MemoryBlock is record

@@ -4,22 +4,73 @@ package body Kronos2.Bus is
    -- init --
    ----------
 
-   procedure init (b: P_Bus) is
+   procedure init (b: P_Bus; full : Boolean := True; tmr: T_Word := 3) is
    begin
-      --  Generated stub: replace with real body!
-      pragma Compile_Time_Warning (Standard.True, "init unimplemented");
-      raise Program_Error with "Unimplemented procedure init";
+      b.addr := 0;
+      b.data := 0;
+      b.idat.state := Bus_Ready;
+      b.idat.radr := 0;
+
+
+      b.idat.dma_on := False;
+      b.idat.tma := 0;
+
+
+      if full then
+         b.idat.tmr := tmr;
+
+         b.idat.itpn := 0;
+         for ir in b.idat.itps'Range loop
+            b.idat.itps(ir) := 0;
+         end loop;
+
+         for i in b.idat.ma'Range loop
+            b.idat.ma(i).m := null;
+            b.idat.ma(i).paddr := T_Address'Last;
+         end loop;
+      end if;
+
    end init;
 
    ---------------
    -- addMemory --
    ---------------
 
-   procedure addMemory (b: P_Bus; m : P_MemoryBlock; paddr: T_Address) is
+   procedure addMemory (b: P_Bus; m : P_MemoryBlock; addr: T_Address) is
+      l, h  : T_Address;
+      j     : T_Word;
+      cm    : P_MemoryBlock;
+      nok   : Boolean;
    begin
-      --  Generated stub: replace with real body!
-      pragma Compile_Time_Warning (Standard.True, "addMemory unimplemented");
-      raise Program_Error with "Unimplemented procedure addMemory";
+      nok := False;
+      for i in reverse b.idat.ma'Range loop
+         cm := b.idat.ma(i).m;
+         if cm /= null then
+            l := b.idat.ma(i).paddr;
+            h := b.idat.ma(i).paddr + getSize(cm);
+            if b.addr >= l and b.addr <= h then
+               if cm /= null then
+                  nok := True;
+                  exit;
+               end if;
+            end if;
+         else
+            j := i; -- store last free slot
+         end if;
+      end loop;
+
+      if nok then
+         -- there is already existed block
+         raise Program_Error with "[addMemory] Memory block is alredy exist";
+      else
+         if m /= null then
+            b.idat.ma(j).paddr := addr;
+            b.idat.ma(j).m := m;
+         else
+            raise Program_Error with "[addMemory] Memory block is damaged";
+         end if;
+      end if;
+
    end addMemory;
 
    -------------
@@ -27,14 +78,29 @@ package body Kronos2.Bus is
    -------------
 
    procedure Monitor (b: P_Bus) is
+      timeout : Boolean;
    begin
       if not isReady(b) then
          b.idat.tma := b.idat.tma + 1;
       end if;
 
-      if b.idat.tma >= b.idat.tmr then
-         b.idat.state := Bus_Ready;
-      end if;
+      timeout :=  b.idat.tma >= b.idat.tmr;
+
+      case b.idat.state is
+         when Bus_Ready =>
+            null;
+         when Bus_MemoryAccess =>
+            null;
+         when Bus_ReadFail =>
+            null;
+         when Bus_WriteFail =>
+            null;
+         when Bus_IORequest =>
+            null;
+         when Bus_IOAnswer =>
+            null;
+      end case;
+
    end Monitor;
 
    -------------
@@ -83,15 +149,53 @@ package body Kronos2.Bus is
       return b.idat.state = Bus_IORequest;
    end hasRequest;
 
+
+   ------------------
+   -- findMemBlock --
+   ------------------
+
+   function findMemBlock(b: P_Bus) return Boolean is
+      l, h  : T_Address;
+      cm    : P_MemoryBlock;
+      ok    : Boolean;
+   begin
+      ok := False;
+      for i in b.idat.ma'Range loop
+         cm := b.idat.ma(i).m;
+         if cm /= null then
+            l := b.idat.ma(i).paddr;
+            h := b.idat.ma(i).paddr + getSize(cm);
+            if b.addr >= l and b.addr <= h then
+               if cm /= null then
+                  b.idat.cm := cm;
+                  b.idat.radr := (b.addr - l);
+                  ok := True;
+                  exit;
+               end if;
+            end if;
+         end if;
+      end loop;
+
+      return ok;
+   end findMemBlock;
+
+
    --------------
    -- writeMem --
    --------------
 
    procedure writeMem (b: P_Bus; addr: T_Address; value: T_Word) is
    begin
-      --  Generated stub: replace with real body!
-      pragma Compile_Time_Warning (Standard.True, "writeMem unimplemented");
-      raise Program_Error with "Unimplemented procedure writeMem";
+
+      if isReady(b) then
+         b.addr := addr;
+         if findMemBlock(b) then
+            writeWord(b.idat.cm, b.idat.radr, value);
+         else
+            b.idat.state := Bus_WriteFail;
+         end if;
+      end if;
+
    end writeMem;
 
    -------------
@@ -99,11 +203,21 @@ package body Kronos2.Bus is
    -------------
 
    function readMem (b: P_Bus; addr: T_Address) return T_Word is
+      value : T_Word;
    begin
-      --  Generated stub: replace with real body!
-      pragma Compile_Time_Warning (Standard.True, "readMem unimplemented");
-      raise Program_Error with "Unimplemented function readMem";
-      return readMem (b => b, addr => addr);
+
+      value := 0;
+
+      if isReady(b) then
+         b.addr := addr;
+         if findMemBlock(b) then
+            value := readWord(b.idat.cm, b.idat.radr);
+         else
+            b.idat.state := Bus_ReadFail;
+         end if;
+      end if;
+
+      return value;
    end readMem;
 
    ------------------
@@ -112,9 +226,16 @@ package body Kronos2.Bus is
 
    procedure writeMemByte (b: P_Bus; addr: T_Address; value: T_Byte) is
    begin
-      --  Generated stub: replace with real body!
-      pragma Compile_Time_Warning (Standard.True, "writeMemByte unimplemented");
-      raise Program_Error with "Unimplemented procedure writeMemByte";
+
+      if isReady(b) then
+         b.addr := addr;
+         if findMemBlock(b) then
+            writeByte(b.idat.cm, b.idat.radr, value);
+         else
+            b.idat.state := Bus_WriteFail;
+         end if;
+      end if;
+
    end writeMemByte;
 
    -----------------
@@ -122,11 +243,22 @@ package body Kronos2.Bus is
    -----------------
 
    function readMemByte (b: P_Bus; addr: T_Address) return T_Byte is
+      value : T_Byte;
    begin
-      --  Generated stub: replace with real body!
-      pragma Compile_Time_Warning (Standard.True, "readMemByte unimplemented");
-      raise Program_Error with "Unimplemented function readMemByte";
-      return readMemByte (b => b, addr => addr);
+
+      value := 0;
+
+      if isReady(b) then
+         b.addr := addr;
+         if findMemBlock(b) then
+            value := readByte(b.idat.cm, b.idat.radr);
+         else
+            b.idat.state := Bus_ReadFail;
+         end if;
+      end if;
+
+      return value;
+
    end readMemByte;
 
    --------------
@@ -140,20 +272,29 @@ package body Kronos2.Bus is
       mnd : in out T_DMA_Mandat)
    is
    begin
-      --  Generated stub: replace with real body!
-      pragma Compile_Time_Warning (Standard.True, "beginDMA unimplemented");
-      raise Program_Error with "Unimplemented procedure beginDMA";
+
+      if isReady(b) then
+         mnd.bus := b;
+         mnd.len := size;
+         b.idat.dma_on := True;
+         b.idat.state := Bus_MemoryAccess;
+         b.addr := addr;
+      end if;
+
    end beginDMA;
 
    ------------
    -- endDMA --
    ------------
 
-   procedure endDMA (b: P_Bus) is
+   procedure endDMA (mnd : in out T_DMA_Mandat) is
    begin
-      --  Generated stub: replace with real body!
-      pragma Compile_Time_Warning (Standard.True, "endDMA unimplemented");
-      raise Program_Error with "Unimplemented procedure endDMA";
+      mnd.bus.idat.dma_on := False;
+      mnd.bus.idat.state := Bus_Ready;
+      mnd.bus.addr := 0;
+
+      mnd.bus := null;
+      mnd.len := 0;
    end endDMA;
 
    ----------------------
