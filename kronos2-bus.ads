@@ -122,6 +122,9 @@ private
 
       ma      : T_MemoryArray;
       cm      : P_MemoryBlock; -- actual bank (cached pointer)
+
+      tmr     : T_Word := 10;
+      tma     : T_Word;
    end record;
 
    type T_DMA_Mandat is record
