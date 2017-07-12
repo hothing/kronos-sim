@@ -30,20 +30,24 @@ begin
 
    adr := 14;
    vi := 16#77556622#;
-   writeMem(qbus, adr, vi); pragma Assert(not hasWriteFail(qbus), "BA-01");
-   vo := readMem(qbus, adr); pragma Assert(not hasReadFail(qbus), "BA-02");
+   requestMem(qbus, adr); pragma Assert(getStatus(qbus) = Bus_MemoryAccess, "BA-00");
+   writeMem(qbus, vi); pragma Assert(getStatus(qbus) = Bus_Ready, "BA-01");
+   requestMem(qbus, adr); pragma Assert(getStatus(qbus) = Bus_MemoryAccess, "BA-02");
+   vo := readMem(qbus); pragma Assert(getStatus(qbus) = Bus_Ready, "BA-03");
    Put(" Value is "); Put(T_Word'Image(vo)); Put(" and expected "); Put_Line(T_Word'Image(vi));
-   pragma Assert(vo = vi, "BA-03");
+   pragma Assert(vo = vi, "BA-04");
 
    adr := MEM_SIZE + 14;
    vi := 16#77556622#;
-   writeMem(qbus, adr, vi); pragma Assert(not hasWriteFail(qbus), "BA-04");
-   vo := readMem(qbus, adr); pragma Assert(not hasReadFail(qbus), "BA-05");
+   requestMem(qbus, adr); pragma Assert(getStatus(qbus) = Bus_MemoryAccess, "BA-05");
+   writeMem(qbus, vi); pragma Assert(getStatus(qbus) = Bus_Ready, "BA-06");
+   requestMem(qbus, adr); pragma Assert(getStatus(qbus) = Bus_MemoryAccess, "BA-07");
+   vo := readMem(qbus); pragma Assert(getStatus(qbus) = Bus_Ready, "BA-08");
    Put(" Value is "); Put(T_Word'Image(vo)); Put(" and expected "); Put_Line(T_Word'Image(vi));
-   pragma Assert(vo = vi, "BA-06");
+   pragma Assert(vo = vi, "BA-09");
 
    adr := MEM_SIZE + 2;
    vi := 16#77556622#;
-   writeMem(qbus, adr, vi); pragma Assert(hasWriteFail(qbus), "BA-07");
+   requestMem(qbus, adr); pragma Assert(getStatus(qbus) = Bus_ReadFail, "BA-10");
 
 end Test_Bus;

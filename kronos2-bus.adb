@@ -10,12 +10,7 @@ package body Kronos2.Bus is
       b.data := 0;
       b.idat.state := Bus_Ready;
       b.idat.radr := 0;
-
-
-      b.idat.dma_on := False;
       b.idat.tma := 0;
-
-
       if full then
          b.idat.tmr := tmr;
 
@@ -29,7 +24,6 @@ package body Kronos2.Bus is
             b.idat.ma(i).paddr := T_Address'Last;
          end loop;
       end if;
-
    end init;
 
    ---------------
@@ -80,7 +74,7 @@ package body Kronos2.Bus is
    procedure Monitor (b: P_Bus) is
       timeout : Boolean;
    begin
-      if not isReady(b) then
+      if b.idat.state /= Bus_Ready then
          b.idat.tma := b.idat.tma + 1;
       end if;
 
@@ -90,6 +84,8 @@ package body Kronos2.Bus is
          when Bus_Ready =>
             null;
          when Bus_MemoryAccess =>
+            null;
+         when Bus_MemoryTransfer =>
             null;
          when Bus_ReadFail =>
             null;
@@ -103,52 +99,35 @@ package body Kronos2.Bus is
 
    end Monitor;
 
-   -------------
-   -- isReady --
-   -------------
-
-   function isReady (b: P_Bus) return Boolean is
-   begin
-      return b.idat.state = Bus_Ready;
-   end isReady;
-   pragma Inline(isReady);
-   -----------------
-   -- hasReadFail --
-   -----------------
-
-   function hasReadFail (b: P_Bus) return Boolean is
-   begin
-      return b.idat.state = Bus_ReadFail;
-   end hasReadFail;
-   pragma Inline(hasReadFail);
-   ------------------
-   -- hasWriteFail --
-   ------------------
-
-   function hasWriteFail (b: P_Bus) return Boolean is
-   begin
-      return b.idat.state = Bus_WriteFail;
-   end hasWriteFail;
-   pragma Inline(hasWriteFail);
-
    ---------------
-   -- hasAnswer --
+   -- getStatus --
    ---------------
 
-   function hasAnswer (b: P_Bus) return Boolean is
+   function getStatus (b: P_Bus) return T_BusState is
    begin
-      return b.idat.state = Bus_IOAnswer;
-   end hasAnswer;
+      return b.idat.state;
+   end getStatus;
+   pragma Inline(getStatus);
 
-   ----------------
-   -- hasRequest --
-   ----------------
+   -----------------
+   -- checkStatus --
+   -----------------
 
-   function hasRequest (b: P_Bus; addr: T_Address) return Boolean is
+   function checkStatus (b: P_Bus) return T_BusState is
+      r : T_BusState;
    begin
-      return b.idat.state = Bus_IORequest;
-   end hasRequest;
+      r := b.idat.state;
+      b.idat.state := Bus_Ready;
+      return r;
+   end checkStatus;
+   pragma Inline(checkStatus);
 
+
+   procedure setStatus(b: P_Bus; ns : T_BusState) is
+   begin
+      b.idat.state := ns;
+   end setStatus;
+   pragma Inline(setStatus);
 
    ------------------
    -- findMemBlock --
@@ -180,19 +159,38 @@ package body Kronos2.Bus is
    end findMemBlock;
 
 
+   procedure requestMem (b: P_Bus; addr: T_Address) is
+      s : T_BusState;
+   begin
+      s := getStatus(b);
+      if s = Bus_Ready or s = Bus_MemoryTransfer then
+         if b.addr /= addr then
+            b.addr := addr;
+            if findMemBlock(b) then
+               setStatus(b, Bus_MemoryAccess);
+            else
+               setStatus(b, Bus_ReadFail);
+            end if;
+         else
+            setStatus(b, Bus_MemoryAccess);
+         end if;
+      end if;
+   end requestMem;
+
+
    --------------
    -- writeMem --
    --------------
 
-   procedure writeMem (b: P_Bus; addr: T_Address; value: T_Word) is
+   procedure writeMem (b: P_Bus; value: T_Word) is
    begin
 
-      if isReady(b) then
-         b.addr := addr;
-         if findMemBlock(b) then
+      if getStatus(b) = Bus_MemoryAccess then
+         if not isReadOnly(b.idat.cm) then
             writeWord(b.idat.cm, b.idat.radr, value);
+            setStatus(b, Bus_Ready);
          else
-            b.idat.state := Bus_WriteFail;
+            setStatus(b, Bus_WriteFail);
          end if;
       end if;
 
@@ -202,19 +200,15 @@ package body Kronos2.Bus is
    -- readMem --
    -------------
 
-   function readMem (b: P_Bus; addr: T_Address) return T_Word is
+   function readMem (b: P_Bus) return T_Word is
       value : T_Word;
    begin
 
       value := 0;
 
-      if isReady(b) then
-         b.addr := addr;
-         if findMemBlock(b) then
-            value := readWord(b.idat.cm, b.idat.radr);
-         else
-            b.idat.state := Bus_ReadFail;
-         end if;
+      if checkStatus(b) = Bus_MemoryAccess then
+         value := readWord(b.idat.cm, b.idat.radr);
+         setStatus(b, Bus_Ready);
       end if;
 
       return value;
@@ -224,15 +218,16 @@ package body Kronos2.Bus is
    -- writeMemByte --
    ------------------
 
-   procedure writeMemByte (b: P_Bus; addr: T_Address; value: T_Byte) is
+   procedure writeMemByte (b: P_Bus; value: T_Byte) is
    begin
 
-      if isReady(b) then
-         b.addr := addr;
+      if getStatus(b) = Bus_MemoryAccess then
+
          if findMemBlock(b) then
             writeByte(b.idat.cm, b.idat.radr, value);
+            setStatus(b, Bus_Ready);
          else
-            b.idat.state := Bus_WriteFail;
+            setStatus(b, Bus_WriteFail);
          end if;
       end if;
 
@@ -242,18 +237,16 @@ package body Kronos2.Bus is
    -- readMemByte --
    -----------------
 
-   function readMemByte (b: P_Bus; addr: T_Address) return T_Byte is
+   function readMemByte (b: P_Bus) return T_Byte is
       value : T_Byte;
    begin
 
       value := 0;
 
-      if isReady(b) then
-         b.addr := addr;
+      if getStatus(b) = Bus_MemoryAccess then
          if findMemBlock(b) then
             value := readByte(b.idat.cm, b.idat.radr);
-         else
-            b.idat.state := Bus_ReadFail;
+            setStatus(b, Bus_Ready);
          end if;
       end if;
 
@@ -273,12 +266,11 @@ package body Kronos2.Bus is
    is
    begin
 
-      if isReady(b) then
+      if getStatus(b) = Bus_Ready then
          mnd.bus := b;
          mnd.len := size;
-         b.idat.dma_on := True;
-         b.idat.state := Bus_MemoryAccess;
          b.addr := addr;
+         setStatus(b, Bus_MemoryTransfer);
       end if;
 
    end beginDMA;
@@ -289,46 +281,139 @@ package body Kronos2.Bus is
 
    procedure endDMA (mnd : in out T_DMA_Mandat) is
    begin
-      mnd.bus.idat.dma_on := False;
-      mnd.bus.idat.state := Bus_Ready;
       mnd.bus.addr := 0;
-
       mnd.bus := null;
       mnd.len := 0;
+
+      setStatus(mnd.bus, Bus_Ready);
    end endDMA;
+
+   procedure nextDMA (mnd : in out T_DMA_Mandat) is
+   begin
+      mnd.bus.addr := mnd.bus.addr + 1;
+      mnd.len := mnd.len - 1;
+   end nextDMA;
+   pragma Inline(nextDMA);
+
+   function checkAddrDMA(mnd : in out T_DMA_Mandat) return Boolean is
+      r : Boolean := False;
+   begin
+      requestMem(mnd.bus, mnd.addr);
+      if getStatus(mnd.bus) = Bus_MemoryTransfer then
+         r := True;
+      end if;
+      return r;
+   end checkAddrDMA;
+
+   function checkDMARange(mnd : in out T_DMA_Mandat) return Boolean is
+      r : Boolean := False;
+   begin
+      if mnd.len > 0 then
+         requestMem(mnd.bus, mnd.addr + mnd.len - 1);
+         if getStatus(mnd.bus) = Bus_MemoryTransfer then
+            requestMem(mnd.bus, mnd.bus.addr);
+            if getStatus(mnd.bus) = Bus_MemoryTransfer then
+               r := True;
+            end if;
+         end if;
+      end if;
+      return r;
+   end checkDMARange;
+
+   -- PROC copyMem: it copy a region memory for DMA
+   procedure copyMem(mnd : in out T_DMA_Mandat; m : P_ByteMemory) is
+   begin
+      if m /= null and mnd.len > 0 then
+         if checkAddrDMA(mnd) then
+            if getSize(mnd.bus.idat.cm) <= mnd.len then
+               copyRegion(mnd.bus.idat.cm, mnd.bus.idat.radr, mnd.len, m);
+               mnd.len := 0;
+            else
+               -- a situation can be when we have two coninued blocks
+               declare
+                  l1, l2, l0  : T_Word;
+                  paddr : T_Address;
+               begin
+                  l1 := getSize(mnd.bus.idat.cm);
+                  l2 := mnd.len - l1;
+                  if l2 > 0 then
+                     copyRegion(mnd.bus.idat.cm, mnd.bus.idat.radr, mnd.len, m);
+                     paddr := mnd.addr;
+                     l0 := mnd.len;
+                     mnd.addr := paddr + l1;
+                     mnd.len := l2;
+                     if checkAddrDMA(mnd) then
+                        if getSize(mnd.bus.idat.cm) <= mnd.len then
+                           copyRegion(mnd.bus.idat.cm, mnd.bus.idat.radr, mnd.len, m);
+                           mnd.len := 0;
+                           mnd.addr := paddr;
+                        end if;
+                     end if;
+                  end if;
+               end;
+            end if;
+         end if;
+      end if;
+   end copyMem;
+
+
+   -- PROC writeDMAWord: it copy a one value into memory for DMA
+   procedure writeDMAWord(mnd : in out T_DMA_Mandat; v : T_Word) is
+   begin
+      requestMem(mnd.bus, mnd.bus.addr);
+      if mnd.len > 0 and getStatus(mnd.bus) = Bus_MemoryTransfer then
+            writeMem(mnd.bus, v);
+            nextDMA(mnd);
+      end if;
+   end writeDMAWord;
+
+
+   -- PROC writeDMAByte: it copy a one value into memory for DMA
+   procedure writeDMAByte(mnd : in out T_DMA_Mandat; v : T_Byte) is
+   begin
+      requestMem(mnd.bus, mnd.bus.addr);
+      if mnd.len > 0 and getStatus(mnd.bus) = Bus_MemoryTransfer then
+            writeMemByte(mnd.bus, v);
+            nextDMA(mnd);
+      end if;
+   end writeDMAByte;
+
 
    ----------------------
    -- requestIOAsSlave --
    ----------------------
 
-   procedure requestIOAsSlave (b: P_Bus) is
+   procedure answerIO (b: P_Bus; addr: T_Address; value : T_Word) is
    begin
-      if isReady(b) then
-         b.idat.state := Bus_IOAnswer;
+      if getStatus(b) = Bus_IORequest and b.addr = addr then
+         b.data := value;
+         setStatus(b, Bus_IOAnswer);
       end if;
-   end requestIOAsSlave;
+   end answerIO;
 
    -----------------------
    -- requestIOAsMaster --
    -----------------------
 
-   procedure requestIOAsMaster (b: P_Bus) is
+   procedure requestIO (b: P_Bus; addr: T_Address) is
    begin
-      if isReady(b) then
-         b.idat.state := Bus_IORequest;
+      if getStatus(b) = Bus_Ready then
+         b.addr := addr;
+         setStatus(b, Bus_IORequest);
       end if;
-   end requestIOAsMaster;
+   end requestIO;
 
    ------------
    -- readIO --
    ------------
 
-   procedure readIO (b: P_Bus) is
+   function readIO (b: P_Bus) return T_Word is
    begin
-      if hasAnswer(b) then
-         null; -- what ???
+      if getStatus(b) = Bus_IOAnswer then
+         setStatus(b, Bus_Ready);
+         return b.data;
       else
-         null; -- waht ???
+         return 0;
       end if;
    end readIO;
 
@@ -355,7 +440,7 @@ package body Kronos2.Bus is
    -- getRecentItp --
    ------------------
 
-   function getRecentItp (b: P_Bus) return T_Byte is
+   function getItp (b: P_Bus) return T_Byte is
       itpNo : T_Byte;
    begin
       itpNo := b.idat.itps(b.idat.itpn);
@@ -365,7 +450,7 @@ package body Kronos2.Bus is
       end if;
 
       return itpNo;
-   end getRecentItp;
+   end getItp;
 
    --------------
    -- checkItp --

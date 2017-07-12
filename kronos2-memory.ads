@@ -28,6 +28,13 @@ package Kronos2.Memory is
    procedure writeByte (m: in P_MemoryBlock; addr : T_Word; val : T_Byte);
    procedure writeWord (m: in P_MemoryBlock; addr : T_Word; val : T_Word);
 
+   procedure copyRegion (m: in P_MemoryBlock;
+                        addr : T_Word;
+                        len : T_Word;
+                        src: P_ByteMemory;
+                        trunc : Boolean := True
+                        );
+
    function hasFail(m: in P_MemoryBlock) return Boolean;
 
    function getSize(m: in P_MemoryBlock) return T_Word;

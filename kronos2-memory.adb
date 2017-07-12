@@ -150,4 +150,36 @@ package body Kronos2.Memory is
 
    end writeWord;
 
+   procedure copyRegion(m: in P_MemoryBlock;
+                        addr : T_Word;
+                        len : T_Word;
+                        src: P_ByteMemory;
+                        trunc : Boolean := True
+                       ) is
+      se : T_Address;
+      ok : Boolean;
+   begin
+      pragma Assert(m /= null, "[copyRegion] Memory block is null");
+      pragma Assert(m.dat /= null, "[copyRegion] Memory is not accessible");
+      pragma Assert(src /= null, "[copyRegion] Source is null");
+
+      se := src'First + len - 1;
+      ok := se <= src'Last;
+      if not ok and trunc then
+         se := src'Last;
+         ok := True;
+      end if;
+
+      if len > 0
+        and ok
+        and addr >= m.dat'First
+        and addr + len <= m.dat'Last
+        and m.mode = ReadWrite
+      then
+         m.dat(addr .. addr + len - 1) := src(src'First .. src'First + len - 1);
+      else
+         m.state := Fail;
+      end if;
+   end copyRegion;
+
 end Kronos2.Memory;
