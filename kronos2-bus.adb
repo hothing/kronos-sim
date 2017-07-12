@@ -48,7 +48,7 @@ package body Kronos2.Bus is
          if cm /= null then
             l := b.idat.ma(i).paddr;
             h := b.idat.ma(i).paddr + getSize(cm);
-            if b.addr >= l and b.addr <= h then
+            if addr >= l and addr <= h then
                if cm /= null then
                   nok := True;
                   exit;

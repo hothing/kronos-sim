@@ -65,7 +65,7 @@ package body Kronos2.Memory is
 
    function getSize(m: in P_MemoryBlock) return T_Word is
    begin
-      return m.dat'Last - m.dat'First;
+      return m.dat'Last - m.dat'First + 1;
    end getSize;
 
 
