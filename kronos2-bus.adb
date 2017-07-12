@@ -28,9 +28,13 @@ package body Kronos2.Bus is
 
    procedure Monitor (b: P_Bus) is
    begin
-      --  Generated stub: replace with real body!
-      pragma Compile_Time_Warning (Standard.True, "Monitor unimplemented");
-      raise Program_Error with "Unimplemented procedure Monitor";
+      if not isReady(b) then
+         b.idat.tma := b.idat.tma + 1;
+      end if;
+
+      if b.idat.tma >= b.idat.tmr then
+         b.idat.state := Bus_Ready;
+      end if;
    end Monitor;
 
    -------------
@@ -39,35 +43,27 @@ package body Kronos2.Bus is
 
    function isReady (b: P_Bus) return Boolean is
    begin
-      --  Generated stub: replace with real body!
-      pragma Compile_Time_Warning (Standard.True, "isReady unimplemented");
-      raise Program_Error with "Unimplemented function isReady";
-      return isReady (b => b);
+      return b.idat.state = Bus_Ready;
    end isReady;
-
+   pragma Inline(isReady);
    -----------------
    -- hasReadFail --
    -----------------
 
    function hasReadFail (b: P_Bus) return Boolean is
    begin
-      --  Generated stub: replace with real body!
-      pragma Compile_Time_Warning (Standard.True, "hasReadFail unimplemented");
-      raise Program_Error with "Unimplemented function hasReadFail";
-      return hasReadFail (b => b);
+      return b.idat.state = Bus_ReadFail;
    end hasReadFail;
-
+   pragma Inline(hasReadFail);
    ------------------
    -- hasWriteFail --
    ------------------
 
    function hasWriteFail (b: P_Bus) return Boolean is
    begin
-      --  Generated stub: replace with real body!
-      pragma Compile_Time_Warning (Standard.True, "hasWriteFail unimplemented");
-      raise Program_Error with "Unimplemented function hasWriteFail";
-      return hasWriteFail (b => b);
+      return b.idat.state = Bus_WriteFail;
    end hasWriteFail;
+   pragma Inline(hasWriteFail);
 
    ---------------
    -- hasAnswer --
@@ -75,10 +71,7 @@ package body Kronos2.Bus is
 
    function hasAnswer (b: P_Bus) return Boolean is
    begin
-      --  Generated stub: replace with real body!
-      pragma Compile_Time_Warning (Standard.True, "hasAnswer unimplemented");
-      raise Program_Error with "Unimplemented function hasAnswer";
-      return hasAnswer (b => b);
+      return b.idat.state = Bus_IOAnswer;
    end hasAnswer;
 
    ----------------
@@ -87,10 +80,7 @@ package body Kronos2.Bus is
 
    function hasRequest (b: P_Bus; addr: T_Address) return Boolean is
    begin
-      --  Generated stub: replace with real body!
-      pragma Compile_Time_Warning (Standard.True, "hasRequest unimplemented");
-      raise Program_Error with "Unimplemented function hasRequest";
-      return hasRequest (b => b, addr => addr);
+      return b.idat.state = Bus_IORequest;
    end hasRequest;
 
    --------------
@@ -172,9 +162,9 @@ package body Kronos2.Bus is
 
    procedure requestIOAsSlave (b: P_Bus) is
    begin
-      --  Generated stub: replace with real body!
-      pragma Compile_Time_Warning (Standard.True, "requestIOAsSlave unimplemented");
-      raise Program_Error with "Unimplemented procedure requestIOAsSlave";
+      if isReady(b) then
+         b.idat.state := Bus_IOAnswer;
+      end if;
    end requestIOAsSlave;
 
    -----------------------
@@ -183,9 +173,9 @@ package body Kronos2.Bus is
 
    procedure requestIOAsMaster (b: P_Bus) is
    begin
-      --  Generated stub: replace with real body!
-      pragma Compile_Time_Warning (Standard.True, "requestIOAsMaster unimplemented");
-      raise Program_Error with "Unimplemented procedure requestIOAsMaster";
+      if isReady(b) then
+         b.idat.state := Bus_IORequest;
+      end if;
    end requestIOAsMaster;
 
    ------------
@@ -194,9 +184,11 @@ package body Kronos2.Bus is
 
    procedure readIO (b: P_Bus) is
    begin
-      --  Generated stub: replace with real body!
-      pragma Compile_Time_Warning (Standard.True, "readIO unimplemented");
-      raise Program_Error with "Unimplemented procedure readIO";
+      if hasAnswer(b) then
+         null; -- what ???
+      else
+         null; -- waht ???
+      end if;
    end readIO;
 
    -----------------
@@ -204,11 +196,18 @@ package body Kronos2.Bus is
    -----------------
 
    function initiateItp (b: P_Bus; iptNo: T_Byte) return Boolean is
+      r : Boolean;
    begin
-      --  Generated stub: replace with real body!
-      pragma Compile_Time_Warning (Standard.True, "initiateItp unimplemented");
-      raise Program_Error with "Unimplemented function initiateItp";
-      return initiateItp (b => b, iptNo => iptNo);
+      r := False;
+      b.idat.itpn := b.idat.itpn + 1;
+      if b.idat.itpn < b.idat.itps'Last then
+         b.idat.itps(b.idat.itpn) := iptNo;
+         r := True;
+      else
+         b.idat.itpn := b.idat.itps'Last;
+      end if;
+
+      return r;
    end initiateItp;
 
    ------------------
@@ -216,11 +215,15 @@ package body Kronos2.Bus is
    ------------------
 
    function getRecentItp (b: P_Bus) return T_Byte is
+      itpNo : T_Byte;
    begin
-      --  Generated stub: replace with real body!
-      pragma Compile_Time_Warning (Standard.True, "getRecentItp unimplemented");
-      raise Program_Error with "Unimplemented function getRecentItp";
-      return getRecentItp (b => b);
+      itpNo := b.idat.itps(b.idat.itpn);
+
+      if b.idat.itpn > b.idat.itps'First then
+         b.idat.itpn := b.idat.itpn - 1;
+      end if;
+
+      return itpNo;
    end getRecentItp;
 
    --------------
@@ -229,10 +232,7 @@ package body Kronos2.Bus is
 
    function checkItp (b: P_Bus; iptNo: T_Byte) return Boolean is
    begin
-      --  Generated stub: replace with real body!
-      pragma Compile_Time_Warning (Standard.True, "checkItp unimplemented");
-      raise Program_Error with "Unimplemented function checkItp";
-      return checkItp (b => b, iptNo => iptNo);
+      return iptNo = b.idat.itps(b.idat.itpn);
    end checkItp;
 
 end Kronos2.Bus;
