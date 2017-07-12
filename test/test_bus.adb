@@ -26,7 +26,7 @@ begin
    ram := new T_MemoryBlock;
    initBlock(ram, new T_ByteMemory(0 .. MEM_SIZE));
 
-   addMemory(qbus, ram, MEM_SIZE + 1);
+   addMemory(qbus, ram, MEM_SIZE + 4);
 
    adr := 14;
    vi := 16#77556622#;
@@ -41,5 +41,9 @@ begin
    vo := readMem(qbus, adr); pragma Assert(not hasReadFail(qbus), "BA-05");
    Put(" Value is "); Put(T_Word'Image(vo)); Put(" and expected "); Put_Line(T_Word'Image(vi));
    pragma Assert(vo = vi, "BA-06");
+
+   adr := MEM_SIZE + 2;
+   vi := 16#77556622#;
+   writeMem(qbus, adr, vi); pragma Assert(hasWriteFail(qbus), "BA-07");
 
 end Test_Bus;
