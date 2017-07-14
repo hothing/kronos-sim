@@ -356,6 +356,17 @@ package body Kronos2.Bus is
       end if;
    end copyMem;
 
+   -- PROC moveMem: it move a region memory for DMA
+   procedure moveMem(mnd : in out T_DMA_Mandat;
+                     saddr : T_Address;
+                     daddr : T_Address;
+                     len   : T_Word
+                    ) is
+   begin
+      pragma Compile_Time_Warning (Standard.True, "Bus:moveMem is unimplemented");
+      null;
+   end moveMem;
+
 
    -- PROC writeDMAWord: it copy a one value into memory for DMA
    procedure writeDMAWord(mnd : in out T_DMA_Mandat; v : T_Word) is

@@ -67,6 +67,13 @@ package Kronos2.Bus is
    -- PROC copyMem: it copy a region memory for DMA
    procedure copyMem(mnd : in out T_DMA_Mandat; m : P_ByteMemory);
 
+   -- PROC moveMem: it move a region memory for DMA
+   procedure moveMem(mnd : in out T_DMA_Mandat;
+                     saddr : T_Address;
+                     daddr : T_Address;
+                     len   : T_Word
+                    );
+
    -- PROC writeDMAWord: it copy a one value into memory for DMA
    procedure writeDMAWord(mnd : in out T_DMA_Mandat; v : T_Word);
 
