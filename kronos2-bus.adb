@@ -321,7 +321,7 @@ package body Kronos2.Bus is
    end checkDMARange;
 
    -- PROC copyMem: it copy a region memory for DMA
-   procedure copyMem(mnd : in out T_DMA_Mandat; m : P_ByteMemory) is
+   procedure copyDMAMem(mnd : in out T_DMA_Mandat; m : P_ByteMemory) is
    begin
       if m /= null and mnd.len > 0 then
          if checkAddrDMA(mnd) then
@@ -354,18 +354,7 @@ package body Kronos2.Bus is
             end if;
          end if;
       end if;
-   end copyMem;
-
-   -- PROC moveMem: it move a region memory for DMA
-   procedure moveMem(mnd : in out T_DMA_Mandat;
-                     saddr : T_Address;
-                     daddr : T_Address;
-                     len   : T_Word
-                    ) is
-   begin
-      pragma Compile_Time_Warning (Standard.True, "Bus:moveMem is unimplemented");
-      null;
-   end moveMem;
+   end copyDMAMem;
 
 
    -- PROC writeDMAWord: it copy a one value into memory for DMA
@@ -378,6 +367,19 @@ package body Kronos2.Bus is
       end if;
    end writeDMAWord;
 
+   -- FUNC readDMAWord: it copy a one value into memory for DMA
+   function readDMAWord(mnd : in out T_DMA_Mandat) return T_Word is
+      v : T_Word;
+   begin
+      requestMem(mnd.bus, mnd.bus.addr);
+      if mnd.len > 0 and getStatus(mnd.bus) = Bus_MemoryTransfer then
+         v := readMem(mnd.bus);
+         nextDMA(mnd);
+      else
+         v := 0;
+      end if;
+      return v;
+   end readDMAWord;
 
    -- PROC writeDMAByte: it copy a one value into memory for DMA
    procedure writeDMAByte(mnd : in out T_DMA_Mandat; v : T_Byte) is
@@ -389,6 +391,42 @@ package body Kronos2.Bus is
       end if;
    end writeDMAByte;
 
+   -- FUNC readDMAByte: it copy a one value into memory for DMA
+   function readDMAByte(mnd : in out T_DMA_Mandat) return T_Byte is
+      v : T_Byte;
+   begin
+      requestMem(mnd.bus, mnd.bus.addr);
+      if mnd.len > 0 and getStatus(mnd.bus) = Bus_MemoryTransfer then
+         v := readMemByte(mnd.bus);
+         nextDMA(mnd);
+      else
+         v := 0;
+      end if;
+      return v;
+   end readDMAByte;
+
+   -- PROC moveMem: it move a region memory for DMA (byte-to-byte)
+   procedure moveDMAMem(mnd : in out T_DMA_Mandat;
+                     daddr : T_Address
+                    ) is
+      v : T_Byte;
+   begin
+
+      for i in 0 .. mnd.len - 1 loop
+         v := readDMAByte(mnd);
+         if getStatus(mnd.bus) = Bus_MemoryTransfer then
+            mnd.bus.addr := daddr + i;
+            if findMemBlock(mnd.bus) then
+               writeByte(mnd.bus.idat.cm, mnd.bus.idat.radr, v);
+            else
+               setStatus(mnd.bus, Bus_WriteFail);
+            end if;
+         else
+            exit;
+         end if;
+      end loop;
+
+   end moveDMAMem;
 
    ----------------------
    -- requestIOAsSlave --

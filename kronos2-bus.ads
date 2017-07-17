@@ -65,20 +65,24 @@ package Kronos2.Bus is
    procedure endDMA (mnd : in out T_DMA_Mandat);
 
    -- PROC copyMem: it copy a region memory for DMA
-   procedure copyMem(mnd : in out T_DMA_Mandat; m : P_ByteMemory);
+   procedure copyDMAMem(mnd : in out T_DMA_Mandat; m : P_ByteMemory);
 
-   -- PROC moveMem: it move a region memory for DMA
-   procedure moveMem(mnd : in out T_DMA_Mandat;
-                     saddr : T_Address;
-                     daddr : T_Address;
-                     len   : T_Word
-                    );
-
-   -- PROC writeDMAWord: it copy a one value into memory for DMA
+   -- PROC writeDMAWord: it copy an one value into memory for DMA
    procedure writeDMAWord(mnd : in out T_DMA_Mandat; v : T_Word);
 
-   -- PROC writeDMAByte: it copy a one value into memory for DMA
+   -- FUNC readDMAWord: it copy a one value into memory for DMA
+   function readDMAWord(mnd : in out T_DMA_Mandat) return T_Word;
+
+   -- PROC writeDMAByte: it copy an one value into memory for DMA
    procedure writeDMAByte(mnd : in out T_DMA_Mandat; v : T_Byte);
+
+   -- FUNC readDMAByte: it gets a value from memory for DMA
+   function readDMAByte(mnd : in out T_DMA_Mandat) return T_Byte;
+
+   -- PROC moveMem: it move a region memory for DMA
+   procedure moveDMAMem (mnd : in out T_DMA_Mandat;
+                         daddr : T_Address
+                        );
 
    -- FUNC write is trying to write a word {bus.data} to a master device
    -- Before use it the adress must be assigned with {bus.addr}
