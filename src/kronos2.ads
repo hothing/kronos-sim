@@ -14,6 +14,8 @@ package Kronos2 is
 
    subtype T_Address is T_Word;
 
+   subtype T_ItpNumber is T_Byte range 0..31;
+
    procedure Initialization;
 
 end Kronos2;
