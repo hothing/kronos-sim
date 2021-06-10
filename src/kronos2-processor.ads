@@ -29,6 +29,7 @@ package Kronos2.Processor is
    
    procedure reset_all_flags(au : in out T_ArithmeticUnit);
    
+     
 private
    
    type T_WordArray is array (T_Word range <>) of T_Word;

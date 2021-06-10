@@ -1,7 +1,47 @@
 with Kronos2.Memory; use Kronos2.Memory;
 with Kronos2.Bus; use Kronos2.Bus;
+with Ada.Direct_IO;
 
 package Kronos2.Disks is
+
+   type T_DiskType is (Disk_Is_Floppy, Disk_Is_Hard, Disk_Is_Virtual);
+
+   MaxCylinder : constant := 1024;
+   MaxHead     : constant := 255;
+   MaxSector   : constant := 63;
+   MaxSectorSize : constant := 1024;
+   DefaultSectorSize : constant := 512;
+
+   subtype T_DiskCylinder is T_Int range 0 .. MaxCylinder;
+   subtype T_DiskHead     is T_Int range 0 .. MaxHead;
+   subtype T_DiskSector   is T_Int range 1 .. MaxSector;
+   subtype T_DiskSecSize  is T_Int range 1 .. MaxSectorSize;
+
+   type T_DriveSpec is record
+      cyls     : T_DiskCylinder; -- amount of cylinders/tracks
+      heads    : T_DiskHead; -- amount of heads
+      sectrk   : T_DiskSector; -- sectors pro track
+      secsize  : T_DiskSecSize; -- size of sector
+      dtype    : T_DiskType; -- disk type
+   end record;
+
+   package DIO is new Ada.Direct_IO(Element_Type => T_Byte);
+
+   type T_DiskImageDescriptor is record
+      hostFile : DIO.File_Type; -- host file contains a disk image
+      mntcnt : T_Int; -- mount's counter
+      size_s : T_Int; -- disk size in sectors (calculated from spec)
+      spec: T_DriveSpec;
+   end record;
+
+   MaxDisks : constant := 32;
+
+   type T_DiskImageArray is array (T_Word range 1 .. MaxDisks) of T_DiskImageDescriptor;
+
+   type T_DriveController is record
+      dma : P_MemoryBlock;
+      hdisks : T_DiskImageArray;
+   end record;
 
    type T_DiskStatus is (Disk_Ready,
                          Disk_Floppy,
@@ -36,48 +76,24 @@ package Kronos2.Disks is
       rate     : T_Word; --  heads stepping
    end record;
 
-   type T_DiskType is (Disk_Is_Floppy, Disk_Is_Hard, Disk_Is_Virtual);
-
-   MaxCylinder : constant := 1024;
-   MaxHead     : constant := 255;
-   MaxSector   : constant := 63;
-   DefaultSectorSize : constant := 512;
-
-   subtype T_DiskCylinder is T_Word range 0 .. 1024;
-   subtype T_DiskHead     is T_Word range 0 .. 255;
-   subtype T_DiskSector   is T_Word range 1 .. 255;
-   subtype T_DiskSecSize  is T_Word range 1 .. 1024;
-   subtype T_DiskLongSector   is T_Word range 0 .. T_Word'Last - 1;
-
-   type T_DriveSpec is record
-      cyls     : T_DiskCylinder; -- amount of cylinders/tracks
-      heads    : T_DiskHead; -- amount of heads
-      sectrk   : T_DiskSector; -- sectors pro track
-      secsize  : T_DiskSecSize; -- size of sector
-      dtype    : T_DiskType; -- disk type
-   end record;
-
-   -- KRONOS2 disk #0 has 1580 sectors per 512 bytes = 808960 bytes
+   -- KRONOS2 disk #0 has 1580 sectors per 512 bytes = 808960 bytes (0.7 MiB)
    -- It can be transleted to CHS(79/2/10) or {79 * 20}
 
-   -- KRONOS2 disk #1 has 41680 sectors per 512 bytes =
+   -- KRONOS2 disk #1 has 41680 sectors per 512 bytes = 21340160 bytes (20.35 MiB)
    -- It can be transleted to CHS(521/2/40) or {521 * 80}
 
-   MaxDisks : constant := 32;
+   procedure bind_DiskImage(dc : in out T_DriveController; id : T_Word; image_path : String; ds : T_DriveSpec);
+   procedure unbind_DiskImage(dc : in out T_DriveController; id : T_Word);
 
-   procedure LinkToBus(bus : P_Bus);
-   procedure BindDiskImage(id : T_Word; image_path : String; ds : T_DriveSpec);
-   procedure UnbindImage(id : T_Word);
+   function mount(dc : in out T_DriveController; id : T_Word) return Boolean;
+   function unmount(dc : in out T_DriveController; id : T_Word) return Boolean;
 
-   function Mount(id : T_Word) return Boolean;
-   function Unmount(id : T_Word) return Boolean;
+   function get_size(dc : in out T_DriveController; id : T_Word; memref: T_Word) return Boolean;
 
-   function GetSize4Kb(id : T_Word; memref: T_Word) return Boolean;
+   function read(dc : in out T_DriveController; id : T_Word; sec: T_Int; memref: T_Address; len : T_Word) return Boolean;
+   function write(dc : in out T_DriveController; id : T_Word; sec: T_Int; memref: T_Address; len : T_Word) return Boolean;
 
-   function Read(id : T_Word; sec: T_DiskLongSector; memref: T_Word; len : T_Word) return Boolean;
-   function Write(id : T_Word; sec: T_DiskLongSector; memref: T_Word; len : T_Word) return Boolean;
-
-   function GetSpecs (id : T_Word; memref: T_Word) return Boolean;
-   function SetSpecs (id : T_Word; memref: T_Word) return Boolean;
+   function get_specs (dc : in out T_DriveController; id : T_Word; memref: T_Address) return Boolean;
+   function set_specs (dc : in out T_DriveController; id : T_Word; memref: T_Address) return Boolean;
 
 end Kronos2.Disks;

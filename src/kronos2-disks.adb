@@ -1,209 +1,180 @@
 with Ada.Direct_IO;
-with Kronos2.Bus;
+with Ada.Unchecked_Conversion;
+with Kronos2.Memory; use Kronos2.Memory;
 
 package body Kronos2.Disks is
-
-   package IO is new Ada.Direct_IO(T_Byte);
-
-   type Disk_Image is record
-      spec  : T_DriveSpec; -- disk specification
-      img   : IO.File_Type; -- refernse to a file with image
-      lnkd  : Boolean; -- is linked to the bus
-      mntc  : T_Word; -- count of mount references
-   end record;
-
-   subtype Imgs_Index is T_Word range 1 .. MaxDisks;
-   type Imgs_Array is array(Imgs_Index) of Disk_Image;
-
-   lbus : P_Bus;
-   dsks : Imgs_Array;
-
-   procedure setAddress(addr: T_Address) is
-   begin
-      lbus.addr := addr;
-   end setAddress;
-
-
-   procedure LinkToBus(bus : P_Bus) is
-   begin
-      for id in dsks'Range loop
-         if dsks(id).lnkd then
-            IO.Close(dsks(id).img);
-         end if;
-         dsks(id).mntc := 0;
-         dsks(id).lnkd := False;
-         dsks(id).spec := (cyls => T_DiskCylinder'First,
-                           heads    => T_DiskHead'First,
-                           sectrk   => T_DiskSector'First,
-                           secsize  => T_DiskSecSize'First,
-                           dtype    => T_DiskType'First
-                          );
-      end loop;
-      lbus := bus;
-   end LinkToBus;
 
    -------------------
    -- BindDiskImage --
    -------------------
 
-   procedure BindDiskImage (id : T_Word; image_path : String; ds : T_DriveSpec) is
+   procedure bind_DiskImage(dc : in out T_DriveController; id : T_Word; image_path : String; ds : T_DriveSpec) is
       t : Boolean;
-      sz : T_Word;
    begin
-      if not dsks(id).lnkd then
+      if dc.hdisks(id).mntcnt <= 0 then
          -- check the specification
          t := ds.cyls > 0;
          t := t and ds.heads > 0;
          t := t and ds.sectrk > 1;
          t := t and ds.secsize > 1;
-         -- calculate a disk size
-         sz := dsks(id).spec.sectrk
-           * dsks(id).spec.secsize
-           * dsks(id).spec.cyls
-           * dsks(id).spec.heads;
-         -- TODO: add logging message here
          if t then
-            IO.Open(dsks(id).img, IO.Inout_File, image_path);
-            dsks(id).spec := ds;
-            dsks(id).lnkd := t;
-            dsks(id).mntc := 0;
+            declare
+               sz : DIO.Positive_Count;
+               size0, size1 : T_Int;
+            begin
+               DIO.Open(dc.hdisks(id).hostFile, DIO.Inout_File, image_path);
+               sz := DIO.Size(dc.hdisks(id).hostFile); -- size of elements = T_Byte'Size
+               size0 := T_Int(sz) / ds.secsize; -- size in sectors
+               -- calculate a disk size by specification
+               size1 := ds.sectrk * ds.cyls * ds.heads;
+               -- TODO: add logging message here
+               if size0 >= size1 then
+                  dc.hdisks(id).spec := ds;
+                  dc.hdisks(id).mntcnt := 0;
+                  dc.hdisks(id).size_s := size1;
+               else
+                   -- TODO: a reaction to invalid specification
+                  null;
+               end if;
+            end;
          else
             raise Program_Error with "Disk specification is invalid";
          end if;
       else
          raise Program_Error with "Disk is already bound to this position";
       end if;
-   end BindDiskImage;
+   end Bind_Diskimage;
 
    -----------------
    -- UnbindImage --
    -----------------
 
-   procedure UnbindImage (id : T_Word) is
+   procedure unbind_DiskImage(dc : in out T_DriveController; id : T_Word) is
    begin
-      if dsks(id).lnkd and dsks(id).mntc < 1 then
-         IO.Close(dsks(id).img);
-         dsks(id).mntc := 0;
+      if id in dc.hdisks'Range then
+         if dc.hdisks(id).mntcnt < 1 then
+            DIO.Close(dc.hdisks(id).hostFile);
+            dc.hdisks(id).mntcnt := -1;
+         end if;
       end if;
-   end UnbindImage;
+   end unbind_DiskImage;
 
    -----------
    -- Mount --
    -----------
 
-   function Mount (id : T_Word) return Boolean is
+   function Mount (dc : in out T_DriveController; id : T_Word) return Boolean is
+      r : Boolean;
    begin
-      if dsks(id).lnkd then
-         dsks(id).mntc := dsks(id).mntc + 1;
+      r := false;
+      if id in dc.hdisks'Range then
+         if dc.hdisks(id).mntcnt >= 0 then
+            dc.hdisks(id).mntcnt := dc.hdisks(id).mntcnt + 1;
+         end if;
+         r := dc.hdisks(id).mntcnt > 0;
       end if;
-      return dsks(id).lnkd;
+      return r;
    end Mount;
 
    --------------
    -- Dismount --
    --------------
 
-   function Unmount (id : T_Word) return Boolean is
+   function Unmount (dc : in out T_DriveController; id : T_Word) return Boolean is
+      mc : T_Int;
+      r : Boolean := False;
    begin
-      if dsks(id).lnkd then
-         if dsks(id).mntc > 0 then
-            dsks(id).mntc := dsks(id).mntc - 1;
+      if id in dc.hdisks'Range then
+         mc := dc.hdisks(id).mntcnt;
+         if dc.hdisks(id).mntcnt > 0 then
+            dc.hdisks(id).mntcnt := dc.hdisks(id).mntcnt - 1;
          end if;
+         r := dc.hdisks(id).mntcnt < mc;
       end if;
-      return dsks(id).lnkd and dsks(id).mntc >= 0;
+      return r;
    end Unmount;
 
    ----------------
    -- GetSize4Kb --
    ----------------
 
-   function GetSize4Kb (id : T_Word; memref: T_Word) return Boolean is
-      r : Boolean;
+   function Word2Int is new Ada.Unchecked_Conversion(Source => T_Word,
+                                                     Target => T_Int);
+
+   function Int2Word is new Ada.Unchecked_Conversion(Source => T_Int,
+                                                     Target => T_Word);
+
+
+   function get_size(dc : in out T_DriveController; id : T_Word; memref: T_Address) return Boolean is
+      r : Boolean := False;
+      size_s : T_Int;
+      U_4K : constant := 4096;
    begin
-      r := False ;
-      if dsks(id).lnkd then
-         declare
-            sz : IO.Positive_Count;
-            size : T_Word;
-         begin
-            r := Mount(id);
-            -- NOTE: This code is direct translated from source of KRONOS-VM
-            --       But I think, here must be a calculation from disk specification
-            sz := IO.Size(dsks(id).img); -- size of elements = T_Byte'Size
-            size := T_Word(sz) / 4096;
-            -- calculate size from the drive specification
-            size := dsks(id).spec.sectrk
-              * dsks(id).spec.secsize
-              * dsks(id).spec.cyls
-              * dsks(id).spec.heads;
-            -- TODO: add logging here to indicate that a file size is not equal a disk size
-            -- TODO: a reaction to invalid specification
-            setAddress(memref);
-            Bus.writeMem(lbus, size);
-            r := Bus.getStatus(lbus) = Bus_Ready;
-            r := r and Unmount(id);
-         exception
-            when IO.Data_Error => r := False ;
-            when IO.End_Error => r := False ;
-            when IO.Status_Error => r := False ;
-            when IO.Mode_Error => r := False ;
-            when IO.Device_Error => r := False ;
-         end;
+      if id in dc.hdisks'Range then
+         if dc.hdisks(id).mntcnt >= 0 then
+            if Mount(dc, id) then
+               --  if dc.hdisks(id).size_s >= U_4K then
+               --     size_s := (dc.hdisks(id).size_s / 4096) * dc.hdisks(id).spec.secsize;
+               --  else
+               --     size_s := (dc.hdisks(id).size_s * dc.hdisks(id).spec.secsize) / 4096;
+               --  end if;
+               size_s := (dc.hdisks(id).size_s * dc.hdisks(id).spec.secsize) / 4096;
+               write(dc.dma.all, memref, Int2Word(size_s));
+               r := Unmount(dc, id);
+            end if;
+         end if;
       end if;
       return r;
-   end GetSize4Kb;
+   end Get_Size;
 
-   function CalcOffset(id : T_Word; sec: T_DiskLongSector) return IO.Positive_Count
+   function Calc_Offset(dc : in out T_DriveController; id : T_Word; sec: T_Int) return DIO.Positive_Count
    is
-      s : T_DiskLongSector;
+      s : T_Int;
+      max_s : constant := MaxCylinder * MaxHead * MaxSector;
    begin
-      if sec > T_DiskLongSector'Last - dsks(id).spec.secsize then
-         s := T_DiskLongSector'Last - dsks(id).spec.secsize;
-      else
+      s := (max_s) / dc.hdisks(id).spec.secsize;
+      if sec <= s then
          s := sec;
+      else
+         s := max_s;
       end if;
-      return IO.Positive_Count(dsks(id).spec.secsize * sec + 1);
-   end CalcOffset;
+      return DIO.Positive_Count(s);
+   end Calc_Offset;
 
    ----------
    -- Read --
    ----------
 
    function Read
-     (id : T_Word; sec: T_DiskLongSector; memref: T_Word; len : T_Word) return Boolean
+     (dc : in out T_DriveController; id : T_Word; sec: T_Int; memref: T_Address; len : T_Word) return Boolean
    is
-      r : Boolean;
+      r : Boolean := False;
    begin
-      r := False ;
-
-      if dsks(id).lnkd then
-
+      if id in dc.hdisks'Range then
          declare
             v : T_Byte;
-            mnd : Bus.T_DMA_Mandat;
+            addr : T_Address := memref;
          begin
-            r := Mount(id);
+            if Mount(dc, id) then
             -- it looks like a translation to linear addressing
-            Bus.beginDMA(lbus, memref, len, mnd);
-            IO.Set_Index(dsks(id).img, CalcOffset(id, sec));
+            DIO.Set_Index(dc.hdisks(id).hostFile, Calc_Offset(dc, id, sec));
             for i in 1 .. len loop
-               IO.Read(dsks(id).img, v);
-               Bus.writeDMAByte(mnd, v);
-               r := r and Bus.getStatus(lbus) = Bus_MemoryTransfer;
-               exit when not r; -- no sense to continue the reading
+               DIO.Read(dc.hdisks(id).hostFile, v);
+               write(dc.dma.all, addr, v);
+               addr := addr + 1;
             end loop;
             -- NOTE: this code is strange, beacuse usualy
             --       the disk drive can read only sector-by-sector
             --       and cannot read a byte.
             -- NOTE2: Argh! It is only optimization!
-            Bus.endDMA(mnd);
-            r := r and Unmount(id);
+               r := Unmount(dc, id);
+            end if;
          exception
-            when IO.Data_Error => r := False ;
-            when IO.End_Error => r := False ;
-            when IO.Status_Error => r := False ;
-            when IO.Mode_Error => r := False ;
-            when IO.Device_Error => r := False ;
+            when DIO.Data_Error => r := False ;
+            when DIO.End_Error => r := False ;
+            when DIO.Status_Error => r := False ;
+            when DIO.Mode_Error => r := False ;
+            when DIO.Device_Error => r := False ;
          end;
       end if;
 
@@ -215,38 +186,37 @@ package body Kronos2.Disks is
    -----------
 
    function Write
-     (id : T_Word; sec: T_DiskLongSector; memref: T_Word; len : T_Word) return Boolean
+     (dc : in out T_DriveController; id : T_Word; sec: T_Int; memref: T_Address; len : T_Word) return Boolean
    is
       r : Boolean;
-      m : T_DMA_Mandat;
    begin
-      r := False ;
-
-      if dsks(id).lnkd then
-
+     if id in dc.hdisks'Range then
          declare
             v : T_Byte;
+            addr : T_Address := memref;
          begin
-            r := Mount(id);
-            IO.Set_Index(dsks(id).img, CalcOffset(id, sec));
-            Bus.beginDMA(lbus, memref, len, m);
+            if Mount(dc, id) then
+            -- it looks like a translation to linear addressing
+            DIO.Set_Index(dc.hdisks(id).hostFile, Calc_Offset(dc, id, sec));
             for i in 1 .. len loop
-               v := Bus.readDMAByte(m);
-               r := r and Bus.getStatus(lbus) = Bus_MemoryTransfer;
-               exit when not r; -- no sense to continue the writing
-               IO.Write(dsks(id).img, v);
+               v := read(dc.dma.all, addr);
+               DIO.Write(dc.hdisks(id).hostFile, v);
+               addr := addr + 1;
             end loop;
-            Bus.endDMA(m);
-            r := r and Unmount(id);
+            -- NOTE: this code is strange, beacuse usualy
+            --       the disk drive can read only sector-by-sector
+            --       and cannot read a byte.
+            -- NOTE2: Argh! It is only optimization!
+               r := Unmount(dc, id);
+            end if;
          exception
-            when IO.Data_Error => r := False ;
-            when IO.End_Error => r := False ;
-            when IO.Status_Error => r := False ;
-            when IO.Mode_Error => r := False ;
-            when IO.Device_Error => r := False ;
+            when DIO.Data_Error => r := False ;
+            when DIO.End_Error => r := False ;
+            when DIO.Status_Error => r := False ;
+            when DIO.Mode_Error => r := False ;
+            when DIO.Device_Error => r := False ;
          end;
       end if;
-
       return r;
    end Write;
 
@@ -254,20 +224,20 @@ package body Kronos2.Disks is
    -- GetSpecs --
    --------------
 
-   function GetSpecs (id : T_Word; memref: T_Word) return Boolean is
+   function Get_Specs (dc : in out T_DriveController; id : T_Word; memref: T_Address) return Boolean is
    begin
       pragma Compile_Time_Warning (Standard.True, "GetSpecs unimplemented");
       return False;
-   end GetSpecs;
+   end Get_Specs;
 
    --------------
    -- SetSpecs --
    --------------
 
-   function SetSpecs (id : T_Word; memref: T_Word) return Boolean is
+   function Set_Specs (dc : in out T_DriveController; id : T_Word; memref: T_Address) return Boolean is
    begin
       pragma Compile_Time_Warning (Standard.True, "SetSpecs unimplemented");
       return False;
-   end SetSpecs;
+   end Set_Specs;
 
 end Kronos2.Disks;
