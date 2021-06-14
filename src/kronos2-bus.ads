@@ -15,17 +15,25 @@ package Kronos2.Bus is
    -- NB Design of T_IODeviceInterface is not good
    -- and as consequence a design of T_IOController is laso not good
 
-   function Ipt(d : T_IODeviceInterface'Class ) return T_ItpNumber is abstract;
+   function get_interrupt(d : T_IODeviceInterface ) return T_ItpNumber is abstract;
 
-   function has_InReq(d : T_IODeviceInterface'Class  ) return Boolean is abstract;
+   function has_answer(d : T_IODeviceInterface  ) return Boolean is abstract;
 
-   function has_OutReq(d : T_IODeviceInterface'Class  ) return Boolean is abstract;
+   procedure recive(d : T_IODeviceInterface  ; val : in out T_Word) is abstract;
 
-   procedure input(d : T_IODeviceInterface'Class  ; val : in out T_Word) is abstract;
+   procedure send(d : T_IODeviceInterface  ; val : in T_Word) is abstract;
 
-   procedure output(d : T_IODeviceInterface'Class  ; val : in T_Word) is abstract;
+   procedure do_step(d : T_IODeviceInterface ) is abstract;
 
-   procedure run(d : T_IODeviceInterface'Class ) is abstract;
+   function Ipt(d : T_IODeviceInterface'Class ) return T_ItpNumber;
+
+   function Answer(d : T_IODeviceInterface'Class  ) return Boolean;
+
+   procedure input(d : T_IODeviceInterface'Class  ; val : in out T_Word);
+
+   procedure output(d : T_IODeviceInterface'Class  ; val : in T_Word);
+
+   procedure step(d : T_IODeviceInterface'Class );
 
    type T_IOController is private;
 
@@ -42,18 +50,18 @@ package Kronos2.Bus is
 
 private
 
-   subtype T_DeviceCount is T_Address range 0 .. 15;
+   subtype T_DeviceIndex is T_Address range 0 .. 15;
 
    type T_DeviceBound is record
       dev : P_IODeviceInterface;
-      addr : T_Address;
+      addr : T_Address; -- gerealized address of device
+      mask : T_Word; -- a mask is using to recognize all addreses of device
    end record;
 
-   type T_IODeviceArray is array (T_DeviceCount) of T_DeviceBound ;
+   type T_IODeviceArray is array (T_DeviceIndex) of T_DeviceBound ;
 
    type T_IOController is record
       devices: T_IODeviceArray; -- list of devices
-      dcnt : T_DeviceCount; -- count of devices
    end record;
 
 end Kronos2.Bus;
