@@ -10,26 +10,29 @@ package Kronos2.Bus is
                       );
 
    type T_IODeviceInterface is abstract tagged null record;
-   type P_IODeviceInterface is access all T_IODeviceInterface ;
+   type P_IODeviceInterface is access all T_IODeviceInterface'Class ;
 
+   -- NB Design of T_IODeviceInterface is not good
+   -- and as consequence a design of T_IOController is laso not good
 
-   function Ipt(d : P_IODeviceInterface ) return T_ItpNumber is abstract;
+   function Ipt(d : T_IODeviceInterface'Class ) return T_ItpNumber is abstract;
 
-   function is_InReq(d : P_IODeviceInterface ) return Boolean is abstract;
+   function has_InReq(d : T_IODeviceInterface'Class  ) return Boolean is abstract;
 
-   function is_OutReq(d : P_IODeviceInterface ) return Boolean is abstract;
+   function has_OutReq(d : T_IODeviceInterface'Class  ) return Boolean is abstract;
 
-   procedure input(d : P_IODeviceInterface ; val : in out T_Word);
+   procedure input(d : T_IODeviceInterface'Class  ; val : in out T_Word) is abstract;
 
-   procedure output(d : P_IODeviceInterface ; val : in T_Word);
+   procedure output(d : T_IODeviceInterface'Class  ; val : in T_Word) is abstract;
 
-   function set_Address(d : P_IODeviceInterface; addr : T_Address ) return T_Address is abstract;
-
-   procedure run(d : P_IODeviceInterface ) is abstract;
+   procedure run(d : T_IODeviceInterface'Class ) is abstract;
 
    type T_IOController is private;
 
-   procedure add_device(ic : in out T_IOController; addr: T_Address; dev: in P_IODeviceInterface );
+   procedure add_device (ic : in out T_IOController;
+                        addr: T_Address; -- start I/O-address
+                        mask : T_Word; -- a mask is using to recognize all addreses of device
+                        dev: in P_IODeviceInterface );
    procedure remove_device(ic : in out T_IOController; addr: T_Address; dev: out P_IODeviceInterface );
    procedure remove_device(ic : in out T_IOController; addr: T_Address);
 

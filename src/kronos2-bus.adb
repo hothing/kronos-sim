@@ -1,6 +1,9 @@
 package body Kronos2.Bus is
 
-   procedure add_device(ic : in out T_IOController; addr: T_Address; dev: in P_IODeviceInterface )
+   procedure add_device(ic : in out T_IOController;
+                        addr: T_Address; -- start I/O-address
+                        mask : T_Word; -- a mask is using to recognize all addreses of device
+                        dev: in P_IODeviceInterface )
    is
       d : P_IODeviceInterface;
    begin
@@ -10,7 +13,6 @@ package body Kronos2.Bus is
             if d = null then
                ic.devices(ic.dcnt).dev := dev;
                ic.devices(ic.dcnt).addr := addr;
-               set_Address(dev, addr);
                ic.dcnt := ic.dcnt + 1;
             end if;
          end if;
@@ -50,7 +52,7 @@ package body Kronos2.Bus is
    begin
       for i in ic.devices'Range loop
          if ic.devices(i).dev /= null then
-            run(ic.devices(i).dev);
+            run(ic.devices(i).dev.all);
          end if;
       end loop;
    end run;
