@@ -13,12 +13,15 @@ package Kronos2.Memory is
 
    function read (m: in T_MemoryBlock; addr : T_Address) return T_Byte;
    function read (m: in T_MemoryBlock; addr : T_Address) return T_Word;
+   function read (m: in T_MemoryBlock; addr : T_Address) return T_DWord;
 
    procedure write (m: in out T_MemoryBlock; addr : T_Address; val : T_Byte);
    procedure write (m: in out T_MemoryBlock; addr : T_Address; val : T_Word);
+   procedure write (m: in out T_MemoryBlock; addr : T_Address; val : T_DWord);
 
    procedure write_ro (m: in out T_MemoryBlock; addr : T_Address; val : T_Byte);
    procedure write_ro (m: in out T_MemoryBlock; addr : T_Address; val : T_Word);
+   procedure write_ro (m: in out T_MemoryBlock; addr : T_Address; val : T_DWord);
 
    procedure copy_region (m: in out T_MemoryBlock;
                          from_addr : T_Address;

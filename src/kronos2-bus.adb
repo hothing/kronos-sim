@@ -1,27 +1,21 @@
 package body Kronos2.Bus is
 
-   function Ipt(d : T_IODeviceInterface'Class ) return T_ItpNumber
+   function Status(d : T_IODeviceInterface'Class  ) return T_DeviceStatus
    is
    begin
-      return get_interrupt(d);
-   end Ipt;
+      return get_status(d);
+   end Status;
 
-   function Answer(d : T_IODeviceInterface'Class  ) return Boolean
+   procedure input(d : T_IODeviceInterface'Class ; register : T_Address; val : in out T_Word)
    is
    begin
-      return has_answer(d);
-   end Answer;
-
-   procedure input(d : T_IODeviceInterface'Class  ; val : in out T_Word)
-   is
-   begin
-      recive(d, val);
+      recive(d, register, val);
    end input;
 
-   procedure output(d : T_IODeviceInterface'Class  ; val : in T_Word)
+   procedure output(d : T_IODeviceInterface'Class ; register : T_Address; val : in T_Word)
    is
    begin
-      send(d, val);
+      send(d, register, val);
    end output;
 
 
@@ -58,7 +52,7 @@ package body Kronos2.Bus is
       success := false;
       for i in ic.devices'Range loop
          if ic.devices(i).dev /= null then
-            success := (ic.devices(i).addr) = (addr and ic.devices(i).mask);
+            success := (ic.devices(i).addr) = (addr and not ic.devices(i).mask);
             if success then
                iofs := i;
                exit;
@@ -70,6 +64,7 @@ package body Kronos2.Bus is
    procedure add_device(ic : in out T_IOController;
                         addr: T_Address; -- start I/O-address
                         mask : T_Word; -- a mask is using to recognize all addreses of device
+                        itp : T_ItpNumber; -- an interrupt used by device
                         dev: in P_IODeviceInterface )
    is
       ix : T_DeviceIndex := ic.devices'Last ;
@@ -80,8 +75,9 @@ package body Kronos2.Bus is
          find_dev_slot(ic, ix, res);
          if res then
             ic.devices(ix).dev := dev;
-            ic.devices(ix).addr := addr and mask;
+            ic.devices(ix).addr := addr and not mask;
             ic.devices(ix).mask := mask;
+            ic.devices(ix).itp := itp;
          end if;
       end if;
    end add_device;
@@ -126,6 +122,51 @@ package body Kronos2.Bus is
       return d;
    end find_device;
 
+   procedure input(ic : in out T_IOController;
+                   addr: T_Address;
+                   val : in out T_Word;
+                   res : in out Boolean
+                  )
+   is
+      ix : T_DeviceIndex := ic.devices'Last ;
+   begin
+      res := false;
+      find_dev_by_addr(ic, addr, ix, res);
+      if res then
+         if Status(ic.devices(ix).dev.all) /= Busy then
+            input(ic.devices(ix).dev.all, addr and ic.devices(ix).mask, val);
+         else
+            -- FIXME: reaction on a busy status
+            null;
+         end if;
+      else
+         -- FIXME: reaction on non-exist device
+         null;
+      end if;
+   end input;
+
+   procedure output(ic : in out T_IOController;
+                    addr: T_Address;
+                    val : in T_Word;
+                    res : in out Boolean
+                   )
+   is
+      ix : T_DeviceIndex := ic.devices'Last ;
+   begin
+      res := false;
+      find_dev_by_addr(ic, addr, ix, res);
+      if res then
+         if Status(ic.devices(ix).dev.all) /= Busy then
+            output(ic.devices(ix).dev.all, addr and ic.devices(ix).mask, val);
+         else
+            -- FIXME: reaction on a busy status
+            null;
+         end if;
+      else
+         -- FIXME: reaction on non-exist device
+         null;
+      end if;
+   end output;
 
    procedure run(ic : in out T_IOController) is
    begin
@@ -135,5 +176,62 @@ package body Kronos2.Bus is
          end if;
       end loop;
    end run;
+
+   procedure start_poll(ic : in out T_IOController)
+   is
+   begin
+      ic.dix := ic.devices'First;
+   end start_poll;
+
+--     function poll(ic : in out T_IOController) return T_DeviceStatus
+--     is
+--        ds : T_DeviceStatus := Ready;
+--        i : T_DeviceIndex := ic.dix;
+--        c, cm : Natural := 0;
+--     begin
+--        cm := Natural(ic.devices'Length);
+--        loop
+--           i := T_DeviceIndex(Natural(i + 1) mod cm);
+--           if not (i'Valid) then
+--              -- MUST NOT HAPPEND
+--              start_poll(ic);
+--              i := ic.dix;
+--           end if;
+--           c := c + 1;
+--           exit when (ic.devices(i).dev /= null) or (c >= cm);
+--        end loop;
+--        if ic.devices(i).dev /= null then
+--           ds := Status(ic.devices(i).dev.all);
+--        end if;
+--        ic.dix := i;
+--        return ds;
+--     end poll;
+
+
+   procedure poll_ipt(ic : in out T_IOController;
+                      ds : in out T_DeviceStatus;
+                      itp : in out T_ItpNumber)
+   is
+      i : T_DeviceIndex := ic.dix;
+      c, cm : Natural := 0;
+      de : Boolean;
+   begin
+      cm := Natural(ic.devices'Length);
+      loop
+         de := (ic.devices(i).dev /= null);
+         exit when de or (c >= cm);
+         c := c + 1;
+      end loop;
+      if de then
+         ds := Status(ic.devices(i).dev.all);
+         case ds is
+            when Ipt_Ext | Ipt_by_In | Ipt_by_Out =>
+               itp := ic.devices(i).itp;
+            when others =>
+               null;
+         end case;
+      end if;
+      ic.dix := T_DeviceIndex(Natural(i + 1) mod cm);
+   end poll_ipt;
 
 end Kronos2.Bus;
