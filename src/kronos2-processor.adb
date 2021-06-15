@@ -1,6 +1,10 @@
 with Ada.Unchecked_Conversion;
+with Ada.Numerics.Elementary_Functions; use Ada.Numerics.Elementary_Functions;
 
 package body Kronos2.Processor is
+
+   C_TRUE : constant := 16#FFFF_FFFF#;
+   C_FALSE : constant := 16#0#;
 
    function Word2Int is new Ada.Unchecked_Conversion(Source => T_Word,
                                                      Target => T_Int);
@@ -126,7 +130,7 @@ package body Kronos2.Processor is
       var := Word2Float(v);
    end pop;
 
-   procedure add_int(au : in out T_ArithmeticUnit)
+   procedure addi32(au : in out T_ArithmeticUnit)
    is
       x, y : T_Int := 0;
    begin
@@ -135,9 +139,9 @@ package body Kronos2.Processor is
       if not test_flag(au, FL_STACK_EMPTY) then
          push(au, x + y);
       end if;
-   end add_int;
+   end addi32;
 
-   procedure sub_int(au : in out T_ArithmeticUnit)
+   procedure subi32(au : in out T_ArithmeticUnit)
      is
       x, y : T_Int := 0;
    begin
@@ -146,9 +150,9 @@ package body Kronos2.Processor is
       if not test_flag(au, FL_STACK_EMPTY) then
          push(au, x - y);
       end if;
-   end sub_int;
+   end subi32;
 
-   procedure mul_int(au : in out T_ArithmeticUnit)
+   procedure muli32(au : in out T_ArithmeticUnit)
      is
       x, y : T_Int := 0;
    begin
@@ -157,9 +161,9 @@ package body Kronos2.Processor is
       if not test_flag(au, FL_STACK_EMPTY) then
          push(au, x * y);
       end if;
-   end mul_int;
+   end muli32;
 
-   procedure div_int(au : in out T_ArithmeticUnit)
+   procedure divi32(au : in out T_ArithmeticUnit)
      is
       x, y : T_Int := 0;
    begin
@@ -172,10 +176,10 @@ package body Kronos2.Processor is
             set_flag(au, FL_IDIV_ZERO);
          end if;
       end if;
-   end div_int;
+   end divi32;
 
-   procedure mod_int(au : in out T_ArithmeticUnit)
-     is
+   procedure modi32(au : in out T_ArithmeticUnit)
+   is
       x, y : T_Int := 0;
    begin
       pop(au, y);
@@ -187,7 +191,326 @@ package body Kronos2.Processor is
             set_flag(au, FL_IDIV_ZERO);
          end if;
       end if;
-   end mod_int;
+   end modi32;
 
+   procedure ceqi32(au : in out T_ArithmeticUnit) -- compare: equal
+   is
+      x, y : T_Int := 0;
+   begin
+      pop(au, y);
+      pop(au, x);
+      if not test_flag(au, FL_STACK_EMPTY) then
+         if x = y then
+            push(au, T_Word(C_TRUE));
+         else
+            push(au, T_Word(C_FALSE));
+         end if;
+      end if;
+   end;
+
+   procedure cnei32(au : in out T_ArithmeticUnit) -- compare: not equal
+   is
+      x, y : T_Int := 0;
+   begin
+      pop(au, y);
+      pop(au, x);
+      if not test_flag(au, FL_STACK_EMPTY) then
+         if x /= y then
+            push(au, T_Word(C_TRUE));
+         else
+            push(au, T_Word(C_FALSE));
+         end if;
+      end if;
+   end;
+
+   procedure clti32(au : in out T_ArithmeticUnit) -- compare: less
+   is
+      x, y : T_Int := 0;
+   begin
+      pop(au, y);
+      pop(au, x);
+      if not test_flag(au, FL_STACK_EMPTY) then
+         if x < y then
+            push(au, T_Word(C_TRUE));
+         else
+            push(au, T_Word(C_FALSE));
+         end if;
+      end if;
+   end;
+
+   procedure cgti32(au : in out T_ArithmeticUnit) -- compare: great
+   is
+      x, y : T_Int := 0;
+   begin
+      pop(au, y);
+      pop(au, x);
+      if not test_flag(au, FL_STACK_EMPTY) then
+         if x > y then
+            push(au, T_Word(C_TRUE));
+         else
+            push(au, T_Word(C_FALSE));
+         end if;
+      end if;
+   end;
+
+   procedure clei32(au : in out T_ArithmeticUnit) -- compare: less or equal
+   is
+      x, y : T_Int := 0;
+   begin
+      pop(au, y);
+      pop(au, x);
+      if not test_flag(au, FL_STACK_EMPTY) then
+         if x <= y then
+            push(au, T_Word(C_TRUE));
+         else
+            push(au, T_Word(C_FALSE));
+         end if;
+      end if;
+   end;
+
+   procedure cgei32(au : in out T_ArithmeticUnit) -- compare: great or equal
+   is
+      x, y : T_Int := 0;
+   begin
+      pop(au, y);
+      pop(au, x);
+      if not test_flag(au, FL_STACK_EMPTY) then
+         if x >= y then
+            push(au, T_Word(C_TRUE));
+         else
+            push(au, T_Word(C_FALSE));
+         end if;
+      end if;
+   end;
+
+   procedure addfp(au : in out T_ArithmeticUnit) --math: addition of FP
+   is
+      x, y : T_Float := 0.0;
+   begin
+      pop(au, y);
+      pop(au, x);
+      if not test_flag(au, FL_STACK_EMPTY) then
+         push(au, x + y);
+      end if;
+   end;
+
+   procedure subfp(au : in out T_ArithmeticUnit) --math: substraction of FP
+   is
+      x, y : T_Float := 0.0;
+   begin
+      pop(au, y);
+      pop(au, x);
+      if not test_flag(au, FL_STACK_EMPTY) then
+         push(au, x - y);
+      end if;
+   end;
+
+   procedure mulfp(au : in out T_ArithmeticUnit) --math: multiplication of FP
+   is
+      x, y : T_Float := 0.0;
+   begin
+      pop(au, y);
+      pop(au, x);
+      if not test_flag(au, FL_STACK_EMPTY) then
+         push(au, x * y);
+      end if;
+   end;
+
+   procedure divfp(au : in out T_ArithmeticUnit) --math: division of FP
+   is
+      x, y : T_Float := 0.0;
+   begin
+      pop(au, y);
+      pop(au, x);
+      if not test_flag(au, FL_STACK_EMPTY) then
+         if y /= 0.0 then
+            -- FIXME: abs(y) must be great epsilon
+            push(au, x / y);
+         else
+            set_flag(au, FL_IDIV_ZERO);
+         end if;
+      end if;
+   end;
+
+   procedure modfp(au : in out T_ArithmeticUnit) --math: division by module of FP
+   is
+      x, y : T_Float := 0.0;
+   begin
+      pop(au, y);
+      pop(au, x);
+      if not test_flag(au, FL_STACK_EMPTY) then
+         if y /= 0.0 then
+            -- FIXME: abs(y) must be great epsilon
+            push(au, x / y); -- ERROR: wrong function
+         else
+            set_flag(au, FL_IDIV_ZERO);
+         end if;
+      end if;
+   end;
+
+   procedure ceqfp(au : in out T_ArithmeticUnit) -- compare: equal
+   is
+      x, y : T_Float := 0.0;
+   begin
+      pop(au, y);
+      pop(au, x);
+      if not test_flag(au, FL_STACK_EMPTY) then
+         if x = y then
+            push(au, T_Word(C_TRUE));
+         else
+            push(au, T_Word(C_FALSE));
+         end if;
+      end if;
+   end;
+
+   procedure cnefp(au : in out T_ArithmeticUnit) -- compare: not equal
+   is
+      x, y : T_Float := 0.0;
+   begin
+      pop(au, y);
+      pop(au, x);
+      if not test_flag(au, FL_STACK_EMPTY) then
+         if x /= y then
+            push(au, T_Word(C_TRUE));
+         else
+            push(au, T_Word(C_FALSE));
+         end if;
+      end if;
+   end;
+
+   procedure cltfp(au : in out T_ArithmeticUnit)-- compare: less
+   is
+      x, y : T_Float := 0.0;
+   begin
+      pop(au, y);
+      pop(au, x);
+      if not test_flag(au, FL_STACK_EMPTY) then
+         if x < y then
+            push(au, T_Word(C_TRUE));
+         else
+            push(au, T_Word(C_FALSE));
+         end if;
+      end if;
+   end;
+
+   procedure cgtfp(au : in out T_ArithmeticUnit) -- compare: great
+   is
+      x, y : T_Float := 0.0;
+   begin
+      pop(au, y);
+      pop(au, x);
+      if not test_flag(au, FL_STACK_EMPTY) then
+         if x > y then
+            push(au, T_Word(C_TRUE));
+         else
+            push(au, T_Word(C_FALSE));
+         end if;
+      end if;
+   end;
+
+   procedure clefp(au : in out T_ArithmeticUnit) -- compare: less or equal
+   is
+      x, y : T_Float := 0.0;
+   begin
+      pop(au, y);
+      pop(au, x);
+      if not test_flag(au, FL_STACK_EMPTY) then
+         if x <= y then
+            push(au, T_Word(C_TRUE));
+         else
+            push(au, T_Word(C_FALSE));
+         end if;
+      end if;
+   end;
+
+   procedure cgefp(au : in out T_ArithmeticUnit) -- compare: great or equal
+   is
+      x, y : T_Float := 0.0;
+   begin
+      pop(au, y);
+      pop(au, x);
+      if not test_flag(au, FL_STACK_EMPTY) then
+         if x >= y then
+            push(au, T_Word(C_TRUE));
+         else
+            push(au, T_Word(C_FALSE));
+         end if;
+      end if;
+   end;
+
+   procedure cvifp(au : in out T_ArithmeticUnit) -- convert: integer to floating-point
+   is
+      x : T_Int := 0;
+   begin
+      pop(au, x);
+      if not test_flag(au, FL_STACK_EMPTY) then
+         push(au, T_Float(x));
+      end if;
+   end;
+
+   procedure cvrnd(au : in out T_ArithmeticUnit) -- convert: floating-point to integer, round
+   is
+      x, y : T_Float := 0.0;
+   begin
+      pop(au, x);
+      if not test_flag(au, FL_STACK_EMPTY) then
+         push(au, T_Int(x));
+      end if;
+   end;
+
+   procedure cvtrn(au : in out T_ArithmeticUnit) -- convert: floating-point to integer, truncate
+   is
+      x, y : T_Float := 0.0;
+   begin
+      pop(au, x);
+      if not test_flag(au, FL_STACK_EMPTY) then
+         push(au, T_Int(x)); -- FIXME, ERROR: wrong operation
+      end if;
+   end;
+
+   procedure sin(au : in out T_ArithmeticUnit) -- math: sinus
+   is
+      x, y : T_Float := 0.0;
+   begin
+      pop(au, x);
+      if not test_flag(au, FL_STACK_EMPTY) then
+         push(au, sin(x));
+      end if;
+   end;
+
+   procedure cos(au : in out T_ArithmeticUnit) -- math: cosinus
+   is
+      x, y : T_Float := 0.0;
+   begin
+      pop(au, x);
+      if not test_flag(au, FL_STACK_EMPTY) then
+         push(au, cos(x));
+      end if;
+   end;
+
+   procedure tan(au : in out T_ArithmeticUnit) -- math: tangens
+   is
+      x, y : T_Float := 0.0;
+   begin
+      pop(au, x);
+      if not test_flag(au, FL_STACK_EMPTY) then
+         push(au, Tan(x));
+      end if;
+   end;
+
+   procedure ctg(au : in out T_ArithmeticUnit) -- math: cotanges
+   is
+      x, y : T_Float := 0.0;
+   begin
+      pop(au, x);
+      if not test_flag(au, FL_STACK_EMPTY) then
+         if x /= 0.0 then
+            push(au, Cot(x));
+         else
+            push(au, 0.0);
+            set_flag(au, FL_FDIV_ZERO);
+         end if;
+      end if;
+   end;
 
 end Kronos2.Processor;
