@@ -173,7 +173,7 @@ package body Kronos2.Processor is
          if y /= 0 then
             push(au, x / y);
          else
-            set_flag(au, FL_IDIV_ZERO);
+            set_flag(au, FL_DIV_ZERO);
          end if;
       end if;
    end divi32;
@@ -188,10 +188,26 @@ package body Kronos2.Processor is
          if y /= 0 then
             push(au, x mod y);
          else
-            set_flag(au, FL_IDIV_ZERO);
+            set_flag(au, FL_DIV_ZERO);
          end if;
       end if;
    end modi32;
+
+   procedure xdivi32(au : in out T_ArithmeticUnit)
+   is
+      x, y : T_Int := 0;
+   begin
+      pop(au, y);
+      pop(au, x);
+      if not test_flag(au, FL_STACK_EMPTY) then
+         if y /= 0 then
+            push(au, x mod y);
+            push(au, x rem y);
+         else
+            set_flag(au, FL_DIV_ZERO);
+         end if;
+      end if;
+   end xdivi32;
 
    procedure ceqi32(au : in out T_ArithmeticUnit) -- compare: equal
    is
@@ -323,27 +339,26 @@ package body Kronos2.Processor is
       pop(au, y);
       pop(au, x);
       if not test_flag(au, FL_STACK_EMPTY) then
-         if y /= 0.0 then
-            -- FIXME: abs(y) must be great epsilon
-            push(au, x / y);
-         else
-            set_flag(au, FL_IDIV_ZERO);
-         end if;
+         push(au, x / y);
       end if;
    end;
 
    procedure modfp(au : in out T_ArithmeticUnit) --math: division by module of FP
    is
-      x, y : T_Float := 0.0;
+      x, y, m : T_Float := 0.0;
    begin
       pop(au, y);
       pop(au, x);
       if not test_flag(au, FL_STACK_EMPTY) then
-         if y /= 0.0 then
-            -- FIXME: abs(y) must be great epsilon
-            push(au, x / y); -- ERROR: wrong function
+         m := abs(x);
+         y := abs(y);
+         while m >= y loop
+            m := m - y;
+         end loop;
+         if x >= 0.0 then
+            push(au, m);
          else
-            set_flag(au, FL_IDIV_ZERO);
+            push(au, -m);
          end if;
       end if;
    end;
@@ -460,11 +475,35 @@ package body Kronos2.Processor is
 
    procedure cvtrn(au : in out T_ArithmeticUnit) -- convert: floating-point to integer, truncate
    is
+      x, y, z, d : T_Float := 0.0;
+   begin
+      pop(au, x);
+      if not test_flag(au, FL_STACK_EMPTY) then
+         z := T_Float(T_Int(x));
+         -- FIXME, ERROR: wrong implementation
+         d := x - z;
+         if x > 0.0 then
+            if abs(d) <= 0.5 and d > 0.0 then
+               z := z - 1.0;
+            end if;
+         else
+            if abs(d) <= 0.5 and d < 0.0 then
+               z := z + 1.0;
+            end if;
+         end if;
+         pragma Compile_Time_Warning(True, "[convert: floating-point to integer, truncate] wrong implementation");
+         -- FIXME:END
+         push(au, T_Int(z));
+      end if;
+   end;
+
+   procedure sqrt(au : in out T_ArithmeticUnit) -- math: square root
+   is
       x, y : T_Float := 0.0;
    begin
       pop(au, x);
       if not test_flag(au, FL_STACK_EMPTY) then
-         push(au, T_Int(x)); -- FIXME, ERROR: wrong operation
+         push(au, Sqrt(x));
       end if;
    end;
 
@@ -508,7 +547,7 @@ package body Kronos2.Processor is
             push(au, Cot(x));
          else
             push(au, 0.0);
-            set_flag(au, FL_FDIV_ZERO);
+            set_flag(au, FL_DIV_ZERO);
          end if;
       end if;
    end;

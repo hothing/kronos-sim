@@ -8,11 +8,13 @@ package Kronos2.Processor is
 
    FL_INT_UNDER : constant := 16#4#;
    FL_INT_OVER : constant := 16#8#;
-   FL_IDIV_ZERO : constant := 16#10#;
+   
+   FL_FP_UNDER : constant := 16#10#;
+   FL_FP_OVER : constant := 16#20#;
 
-   FL_FP_UNDER : constant := 16#20#;
-   FL_FP_OVER : constant := 16#40#;
-   FL_FDIV_ZERO : constant := 16#80#;
+   FL_DIV_ZERO : constant := 16#100#;
+
+   MODE_CHECK_FP_RESULT :  constant := 16#10#;
    
    procedure push(au : in out T_ArithmeticUnit; val : T_Word);
    procedure push(au : in out T_ArithmeticUnit; val : T_HalfWord);
@@ -31,6 +33,7 @@ package Kronos2.Processor is
    procedure muli32(au : in out T_ArithmeticUnit); --math: multiplication of integers
    procedure divi32(au : in out T_ArithmeticUnit); --math: division of integers
    procedure modi32(au : in out T_ArithmeticUnit); --math: division by module of integers
+   procedure xdivi32(au : in out T_ArithmeticUnit); -- math: extended division (modulo + remainder)
    
    procedure ceqi32(au : in out T_ArithmeticUnit); -- compare: equal
    procedure cnei32(au : in out T_ArithmeticUnit); -- compare: not equal
@@ -56,13 +59,14 @@ package Kronos2.Processor is
    procedure cvrnd(au : in out T_ArithmeticUnit); -- convert: floating-point to integer, round
    procedure cvtrn(au : in out T_ArithmeticUnit); -- convert: floating-point to integer, truncate
    
+   procedure sqrt(au : in out T_ArithmeticUnit); -- math: square root
+     
    procedure sin(au : in out T_ArithmeticUnit); -- math: sinus
    procedure cos(au : in out T_ArithmeticUnit); -- math: cosinus
    procedure tan(au : in out T_ArithmeticUnit); -- math: tangens
    procedure ctg(au : in out T_ArithmeticUnit); -- math: cotanges
    
    procedure reset_all_flags(au : in out T_ArithmeticUnit);
-   
      
 private
    
@@ -71,7 +75,8 @@ private
    type T_ArithmeticUnit is record
       stack : T_WordArray (0 .. 6);
       top : T_Word;
-      flags: T_Word;
+      flags: T_Word; -- some bit flags with auxiliary results of operations
+      mode : T_Word; -- bit-field modesmap:activate/deactivate calculation modes
    end record;
    
 
